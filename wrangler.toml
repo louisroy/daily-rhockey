@@ -1,0 +1,8 @@
+name = "daily-rhockey"
+main = "src/index.ts"
+compatibility_date = "2023-02-10"
+
+[[ d1_databases ]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "daily-rhockey-db"
+database_id = "7942cccd-4f42-4d7f-8264-20f89178854d"
