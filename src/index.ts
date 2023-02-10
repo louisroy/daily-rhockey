@@ -22,17 +22,30 @@ export interface Env {
 }
 
 export default {
+	async scheduled(
+		event: ScheduledEvent,
+		env: Env,
+		ctx: ExecutionContext
+	) {
+		// Write code for updating your API
+		switch (event.cron) {
+			case '0 9 * * *':
+				const created_at = Math.floor(new Date().getTime() / 1000)
+				const response = await fetch("https://old.reddit.com/r/hockey/top/.rss?sort=top&t=day");
+				const body = await response.text();
+				await env.DB.prepare(
+					"INSERT INTO documents (created_at, body) VALUES (?, ?)"
+				).bind(created_at, body).all()
+				break;
+		}
+		console.log('cron processed');
+	},
+
 	async fetch(
 		request: Request,
 		env: Env,
 		ctx: ExecutionContext
 	): Promise<Response> {
-		const created_at = Math.floor(new Date().getTime() / 1000)
-		const response = await fetch("https://old.reddit.com/r/hockey/top/.rss?sort=top&t=day");
-		const body = await response.text();
-		await env.DB.prepare(
-			"INSERT INTO documents (created_at, body) VALUES (?, ?)"
-		).bind(created_at, body).all()
-		return new Response(body);
+		return new Response("Hello World");
 	},
 };
