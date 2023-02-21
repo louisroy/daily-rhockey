@@ -1,23 +1,4 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `wrangler dev src/index.ts` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `wrangler publish src/index.ts --name my-worker` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
-
 export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-
 	DB: D1Database;
 }
 
@@ -38,14 +19,69 @@ export default {
 				).bind(created_at, body).all()
 				break;
 		}
-		console.log('cron processed');
 	},
 
-	async fetch(
+	fetch: async function (
 		request: Request,
 		env: Env,
 		ctx: ExecutionContext
 	): Promise<Response> {
-		return new Response("Hello World");
+		const {searchParams} = new URL(request.url)
+		let currentTimestamp = searchParams.get('created_at')
+
+		let stmt = env.DB.prepare('SELECT * FROM documents ORDER BY created_at DESC LIMIT 7');
+		if (!currentTimestamp) {
+			currentTimestamp = await stmt.first('created_at');
+		}
+		let all = await stmt.all();
+		let nav = all.results?.map((result: any) => {
+			let d = new Date(result.created_at * 1000);
+			let day = d.toLocaleDateString("en-CA", {weekday: 'long'});
+			if (result.created_at == currentTimestamp) {
+				return `
+					${day}
+				`;
+			} else {
+				return `
+					<a href="?created_at=${result.created_at}">${day}</a>
+				`;
+			}
+		});
+
+		stmt = env.DB.prepare('SELECT * FROM documents WHERE created_at = ?').bind(currentTimestamp);
+		let xml: string = await stmt.first('body') ;
+		let links = xml?.match(/(?<=href=")(.*?)(?=")/igm)?.slice(2);
+		let titles = xml?.match(/(?<=<title>)(.*?)(?=<\/title>)/igm)?.slice(1);
+		let body = links?.map((link, i) => {
+			return `
+				<p>
+					<a target="_blank" href="${link}">${titles![i]}</a>
+				</p>
+			`;
+		});
+		return new Response(`<!DOCTYPE html>
+			<head>
+				<title>Daily /r/hockey</title>
+				<style>
+					p {
+						max-width: 75ch;
+					}
+				</style>
+			</head>
+			<body>
+				<h1>Daily /r/hockey</h1>
+				<nav>
+					${nav?.join("")}
+				</nav>
+				<hr />
+				<main>
+					${body?.join("")}
+				</main>
+			</body>
+		`, {
+			headers: {
+				'content-type': 'text/html;charset=UTF-8',
+			},
+		});
 	},
 };
