@@ -1,5 +1,5 @@
 # Daily /r/hockey
 
-Simple web view for /r/hockey top stories.
+Simplified [web view](https://daily-rhockey.lroy.workers.dev/) for [/r/hockey](https://old.reddit.com/r/hockey/) daily top stories.
 
-Powered by Cloudflare Workers.
+Powered by [Cloudflare Workers](https://developers.cloudflare.com/workers/).

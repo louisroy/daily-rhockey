@@ -1,65 +1,65 @@
 export interface Env {
-	DB: D1Database;
+    DB: D1Database;
 }
 
 export default {
-	async scheduled(
-		event: ScheduledEvent,
-		env: Env,
-		ctx: ExecutionContext
-	) {
-		// Write code for updating your API
-		switch (event.cron) {
-			case '0 9 * * *':
-				const created_at = Math.floor(new Date().getTime() / 1000)
-				const response = await fetch("https://old.reddit.com/r/hockey/top/.rss?sort=top&t=day");
-				const body = await response.text();
-				await env.DB.prepare(
-					"INSERT INTO documents (created_at, body) VALUES (?, ?)"
-				).bind(created_at, body).all()
-				break;
-		}
-	},
+    async scheduled(
+        event: ScheduledEvent,
+        env: Env,
+        ctx: ExecutionContext
+    ) {
+        switch (event.cron) {
+            case '0 9 * * *':
+                const created_at = Math.floor(new Date().getTime() / 1000)
+                const response = await fetch("https://old.reddit.com/r/hockey/top/.rss?sort=top&t=day");
+                const body = await response.text();
+                await env.DB.prepare(
+                    "INSERT INTO documents (created_at, body) VALUES (?, ?)"
+                ).bind(created_at, body).all()
+                break;
+        }
+    },
 
-	fetch: async function (
-		request: Request,
-		env: Env,
-		ctx: ExecutionContext
-	): Promise<Response> {
-		const {searchParams} = new URL(request.url)
-		let currentTimestamp = searchParams.get('created_at')
+    fetch: async function (
+        request: Request,
+        env: Env,
+        ctx: ExecutionContext
+    ): Promise<Response> {
+        const {searchParams} = new URL(request.url)
+        let currentTimestamp = searchParams.get('created_at')
 
-		let stmt = env.DB.prepare('SELECT * FROM documents ORDER BY created_at DESC LIMIT 7');
-		if (!currentTimestamp) {
-			currentTimestamp = await stmt.first('created_at');
-		}
-		let all = await stmt.all();
-		let nav = all.results?.map((result: any) => {
-			let d = new Date(result.created_at * 1000);
-			let day = d.toLocaleDateString("en-CA", {weekday: 'long'});
-			if (result.created_at == currentTimestamp) {
-				return `
+        const navStatement = env.DB.prepare('SELECT * FROM documents ORDER BY created_at DESC LIMIT 7');
+        if (!currentTimestamp) {
+            currentTimestamp = await navStatement.first('created_at');
+        }
+        const navResults = await navStatement.all();
+        const nav = navResults.results?.map((result: any) => {
+            let d = new Date(result.created_at * 1000);
+            let day = d.toLocaleDateString("en-CA", {weekday: 'long'});
+            if (result.created_at == currentTimestamp) {
+                return `
 					${day}
 				`;
-			} else {
-				return `
+            } else {
+                return `
 					<a href="?created_at=${result.created_at}">${day}</a>
 				`;
-			}
-		});
+            }
+        });
 
-		stmt = env.DB.prepare('SELECT * FROM documents WHERE created_at = ?').bind(currentTimestamp);
-		let xml: string = await stmt.first('body') ;
-		let links = xml?.match(/(?<=href=")(.*?)(?=")/igm)?.slice(2);
-		let titles = xml?.match(/(?<=<title>)(.*?)(?=<\/title>)/igm)?.slice(1);
-		let body = links?.map((link, i) => {
-			return `
+        const mainStatement = env.DB.prepare('SELECT * FROM documents WHERE created_at = ?').bind(currentTimestamp);
+        const xml: string = await mainStatement.first('body');
+        // FIXME: use an actual XML parser instead of this garbage
+        const links = xml?.match(/(?<=href=")(.*?)(?=")/igm)?.slice(2);
+        const titles = xml?.match(/(?<=<title>)(.*?)(?=<\/title>)/igm)?.slice(1);
+        const main = links?.map((link, i) => {
+            return `
 				<p>
 					<a target="_blank" href="${link}">${titles![i]}</a>
 				</p>
 			`;
-		});
-		return new Response(`<!DOCTYPE html>
+        });
+        const html = `<!DOCTYPE html>
 			<head>
 				<title>Daily /r/hockey</title>
 				<style>
@@ -75,13 +75,15 @@ export default {
 				</nav>
 				<hr />
 				<main>
-					${body?.join("")}
+					${main?.join("")}
 				</main>
 			</body>
-		`, {
-			headers: {
-				'content-type': 'text/html;charset=UTF-8',
-			},
-		});
-	},
+		`;
+
+        return new Response(html, {
+            headers: {
+                'content-type': 'text/html;charset=UTF-8',
+            },
+        });
+    },
 };
