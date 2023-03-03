@@ -54,17 +54,32 @@ export default {
         const titles = xml?.match(/(?<=<title>)(.*?)(?=<\/title>)/igm)?.slice(1);
         const main = links?.map((link, i) => {
             return `
-				<p>
+				<li>
 					<a target="_blank" href="${link}">${titles![i]}</a>
-				</p>
+				</li>
 			`;
         });
         const html = `<!DOCTYPE html>
 			<head>
 				<title>Daily /r/hockey</title>
+				<meta name="viewport" content="width=device-width,initial-scale=1">
 				<style>
-					p {
+					body {
 						max-width: 75ch;
+						margin:0 auto;
+						padding:0 10px;
+					}
+					
+					nav {
+					    font-size:13px;
+					}
+					
+					ol {
+					    padding-left:20px;
+					}
+					
+					li  {
+					    padding-bottom:15px;
 					}
 				</style>
 			</head>
@@ -75,7 +90,9 @@ export default {
 				</nav>
 				<hr />
 				<main>
-					${main?.join("")}
+                    <ol>
+                        ${main?.join("")}
+                    </ol>
 				</main>
 			</body>
 		`;
